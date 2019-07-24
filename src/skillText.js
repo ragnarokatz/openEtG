@@ -45,7 +45,7 @@ const data = {
 			c.upped ? 3 : 2
 		}|-1 when it attacks."`,
 	accretion:
-		'Destroy target permanent & gain 0|10. If using this ability leaves this creature at more than 30 HP, destroy this creature and add a black hole to your hand.',
+		'Destroy target permanent and gain 0|10. If using this ability leaves this creature at more than 30 HP, destroy this creature and add a black hole to your hand.',
 	accumulation: 'Playing additional repulsors adds to damage reduction.',
 	adrenaline:
 		'Target creature attacks multiple times per turn. Creatures with lower strength attack more times per turn.',
@@ -62,7 +62,7 @@ const data = {
 	atk2hp: "Set target's HP equal to its strength.",
 	autoburrow: 'Until end of turn, creatures with burrow enter play burrowed.',
 	axedraw:
-		'Gains +1 strength for every card drawn by any player. Strength gained is removed after attack.',
+		'Gains 1 strength for every card drawn by any player. Strength gained is removed after attack.',
 	bblood: 'Give target creature 0|20 and delay it for 5 turns.',
 	becomearctic:
 		'If frozen, this creature instead turns into an Arctic Squid.',
@@ -550,8 +550,8 @@ const data = {
 	swave:
 		"Deal 4 spell damage to target creature or player. If target creature is frozen, it dies. If target player's weapon is frozen, destroy it.",
 	tempering: [
-		'Target weapon deals gains 3 strength. If target weapon is frozen, it loses frozen status.',
-		'Target weapon deals gains 5 strength. If target weapon is frozen, it loses frozen status.',
+		'Target weapon gains 3 strength. If target weapon is frozen, it loses frozen status.',
+		'Target weapon gains 5 strength. If target weapon is frozen, it loses frozen status.',
 	],
 	tesseractsummon:
 		'Summon 2 random creatures from your deck. Opponent summons 1 random creature from their deck. Freeze these creatures for a number of turns equal to ¼ of their quanta cost, rounded up.',
