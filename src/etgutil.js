@@ -26,13 +26,6 @@ export function toTrueMark(n) {
 export function toTrueMarkSuffix(n) {
 	return `01${encodeCode(n + 9010)}`;
 }
-export function* iterdeck(deck) {
-	for (let i = 0; i < deck.length; i += 5) {
-		const count = parseInt(deck.substr(i, 2), 32),
-			code = parseInt(deck.substr(i + 2, 3), 32);
-		for (let j = 0; j < count; j++) yield code;
-	}
-}
 export function* iterraw(deck) {
 	for (let i = 0; i < deck.length; i += 5) {
 		const count = parseInt(deck.substr(i, 2), 32),
@@ -40,12 +33,16 @@ export function* iterraw(deck) {
 		yield [code, count];
 	}
 }
+export function* iterdeck(deck) {
+	for (const [code, count] of iterraw(deck)) {
+		for (let j = 0; j < count; j++) yield code;
+	}
+}
 export function count(deck, code) {
 	let total = 0;
-	const key = encodeCode(code);
-	for (let i = 0; i < deck.length; i += 5) {
-		if (key === deck.substr(i + 2, 3)) {
-			total += parseInt(deck.substr(i, 2), 32);
+	for (const [dcode, count] of iterraw(deck)) {
+		if (decode === code) {
+			total += count;
 		}
 	}
 	return total;
@@ -69,12 +66,11 @@ export function encodedeck(deck) {
 	return out;
 }
 export function decodedeck(deck) {
-	if (!deck) return [];
-	return Array.from(iterdeck(deck));
+	return deck ? Array.from(iterdeck(deck)) : [];
 }
 export function deck2pool(deck, pool) {
-	if (!deck) return [];
 	pool = pool || [];
+	if (!deck) return pool;
 	for (const [code, count] of iterraw(deck)) {
 		pool[code] = (pool[code] || 0) + count;
 	}

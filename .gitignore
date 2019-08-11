@@ -1,6 +1,6 @@
 node_modules/*
 Cards/*
-cia/Cards/*
+db/*
 atlas.json
 atlas.css
 atlas.png
