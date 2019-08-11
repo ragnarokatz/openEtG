@@ -103,7 +103,9 @@ function CostText(props) {
 }
 function TitleText(props) {
 	return (
-		<div style={{ fontSize: '20px', textAlign: 'center' }}>{props.text}</div>
+		<div style={{ fontSize: '20px', textAlign: 'center' }}>
+			{props.text}
+		</div>
 	);
 }
 function AiButton(props) {
@@ -168,7 +170,8 @@ export default connect(({ user, opts }) => ({
 		constructor(props) {
 			super(props);
 			this.state = {
-				showcard: props.nymph || (!props.user.daily && props.user.ocard),
+				showcard:
+					props.nymph || (!props.user.daily && props.user.ocard),
 				showsettings: false,
 				changepass: false,
 				newpass: '',
@@ -178,11 +181,15 @@ export default connect(({ user, opts }) => ({
 			};
 
 			this.resetTip = e => {
-				if (e.target.tagName && e.target.tagName.match(/^(DIV|CANVAS|HTML)$/)) {
+				if (
+					e.target.tagName &&
+					e.target.tagName.match(/^(DIV|CANVAS|HTML)$/)
+				) {
 					const tipText = this.props.user
 						? tipjar[this.state.tipNumber]
 						: "To register, just type desired username & password in the fields to the right, then click 'Login'";
-					if (tipText !== this.state.tipText) this.setState({ tipText });
+					if (tipText !== this.state.tipText)
+						this.setState({ tipText });
 				}
 			};
 		}
@@ -225,11 +232,17 @@ export default connect(({ user, opts }) => ({
 					codecode: data => {
 						this.props.dispatch(
 							store.updateUser({
-								pool: etgutil.addcard(this.props.user.pool, data.card),
+								pool: etgutil.addcard(
+									this.props.user.pool,
+									data.card,
+								),
 							}),
 						);
 						this.props.dispatch(
-							store.chatMsg(Cards.Codes[data.card].name + ' added!', 'System'),
+							store.chatMsg(
+								Cards.Codes[data.card].name + ' added!',
+								'System',
+							),
 						);
 					},
 				}),
@@ -257,12 +270,16 @@ export default connect(({ user, opts }) => ({
 							self.props.user,
 						)
 					) {
-						store.store.dispatch(store.chatMsg(`Invalid deck`, 'System'));
+						store.store.dispatch(
+							store.chatMsg(`Invalid deck`, 'System'),
+						);
 						return;
 					}
 					const cost = userutil.arenaCost(i);
 					if (self.props.user.gold < cost) {
-						self.props.dispatch(store.chatMsg(`Requires ${cost}$`, 'System'));
+						self.props.dispatch(
+							store.chatMsg(`Requires ${cost}$`, 'System'),
+						);
 						return;
 					}
 					sock.userEmit('foearena', { lv: i });
@@ -288,7 +305,9 @@ export default connect(({ user, opts }) => ({
 						key={i}
 						value={`Arena${i + 1} T20`}
 						onClick={() => {
-							this.props.dispatch(store.doNav(import('./ArenaTop'), { lv: i }));
+							this.props.dispatch(
+								store.doNav(import('./ArenaTop'), { lv: i }),
+							);
 						}}
 						onMouseOver={this.mkSetTip(
 							'See who the top players in arena are right now',
@@ -316,7 +335,8 @@ export default connect(({ user, opts }) => ({
 							key={i}
 							value={i + 1}
 							className={`editbtn ${
-								self.props.user.selectedDeck == self.props.user.qecks[i]
+								self.props.user.selectedDeck ==
+								self.props.user.qecks[i]
 									? ' selectedbutton'
 									: ''
 							}`}
@@ -324,7 +344,9 @@ export default connect(({ user, opts }) => ({
 								sock.userExec('setdeck', {
 									name: self.props.user.qecks[i] || '',
 								});
-								self.props.dispatch(store.setOptTemp('deck', sock.getDeck()));
+								self.props.dispatch(
+									store.setOptTemp('deck', sock.getDeck()),
+								);
 							}}
 						/>,
 					);
@@ -355,7 +377,8 @@ export default connect(({ user, opts }) => ({
 								value="Next Tip"
 								onClick={() => {
 									const newTipNumber =
-										(this.state.tipNumber + 1) % tipjar.length;
+										(this.state.tipNumber + 1) %
+										tipjar.length;
 									this.setState({
 										tipNumber: newTipNumber,
 										tipText: tipjar[newTipNumber],
@@ -393,79 +416,133 @@ export default connect(({ user, opts }) => ({
 						</Rect>
 						<Rect x={304} y={380} wid={292} hei={130}>
 							<TitleText text="Miscellaneous" />
-							<div
-								style={{
-									width: '45%',
-									float: 'left',
-									textAlign: 'right',
-								}}>
-								<input
-									type="button"
-									value="Colosseum"
-									onClick={() => {
-										this.props.dispatch(store.doNav(import('./Colosseum')));
-									}}
-									onMouseOver={this.mkSetTip(
-										'Try some daily challenges in the Colosseum',
-									)}
-								/>
+							<div>
+								<div
+									style={{
+										display: 'inline-block',
+										width: '49%',
+										textAlign: 'center',
+									}}>
+									<input
+										type="button"
+										value="Colosseum"
+										onClick={() => {
+											this.props.dispatch(
+												store.doNav(
+													import('./Colosseum'),
+												),
+											);
+										}}
+										onMouseOver={this.mkSetTip(
+											'Try some daily challenges in the Colosseum',
+										)}
+									/>
+								</div>
+								<div
+									style={{
+										display: 'inline-block',
+										width: '49%',
+										textAlign: 'center',
+									}}>
+									<input
+										type="button"
+										value="Quests"
+										onClick={() => {
+											this.props.dispatch(
+												store.doNav(import('./Quest')),
+											);
+										}}
+										onMouseOver={this.mkSetTip(
+											'Go on an adventure',
+										)}
+									/>
+								</div>
 							</div>
 							<div
 								style={{
-									width: '45%',
-									float: 'right',
+									marginTop: '4px',
 								}}>
-								<input
-									type="button"
-									value="Quests"
-									onClick={() => {
-										this.props.dispatch(store.doNav(import('./Quest')));
-									}}
-									onMouseOver={this.mkSetTip('Go on an adventure')}
-								/>
+								<div
+									style={{
+										display: 'inline-block',
+										width: '49%',
+										textAlign: 'center',
+									}}>
+									<input
+										type="button"
+										value="Arena Deck"
+										onClick={() => {
+											this.props.dispatch(
+												store.doNav(
+													import('./ArenaInfo'),
+												),
+											);
+										}}
+										onMouseOver={this.mkSetTip(
+											'Check how your arena decks are doing',
+										)}
+									/>
+								</div>
+								<div
+									style={{
+										display: 'inline-block',
+										width: '49%',
+										textAlign: 'center',
+									}}>
+									<input
+										type="button"
+										value="Custom"
+										onClick={() => {
+											this.props.dispatch(
+												store.doNav(
+													import('./Challenge'),
+													{
+														pvp: false,
+													},
+												),
+											);
+										}}
+										onMouseOver={this.mkSetTip(
+											'Setup custom games vs AI or other players',
+										)}
+									/>
+								</div>
 							</div>
 							<div
 								style={{
-									marginTop: '12px',
-									width: '45%',
-									float: 'left',
-									textAlign: 'right',
+									marginTop: '4px',
 								}}>
-								<input
-									type="button"
-									value="Arena Deck"
-									onClick={() => {
-										this.props.dispatch(store.doNav(import('./ArenaInfo')));
-									}}
-									onMouseOver={this.mkSetTip(
-										'Check how your arena decks are doing',
-									)}
-								/>
-							</div>
-							<div
-								style={{
-									marginTop: '12px',
-									width: '45%',
-									float: 'right',
-								}}>
-								<input
-									type="button"
-									value="Custom"
-									onClick={() => {
-										this.props.dispatch(
-											store.doNav(import('./Challenge'), {
-												pvp: false,
-											}),
-										);
-									}}
-									onMouseOver={this.mkSetTip(
-										'Setup custom games vs AI or other players',
-									)}
-								/>
+								<div
+									style={{
+										display: 'inline-block',
+										width: '49%',
+										textAlign: 'center',
+									}}>
+									<input
+										type="button"
+										value="Original"
+										onClick={() => {
+											this.props.dispatch(
+												store.doNav(
+													import(
+														'../vanilla/views/MainMenu.js'
+													),
+												),
+											);
+										}}
+										onMouseOver={this.mkSetTip(
+											'A mode attempting to imitate the original EtG',
+										)}
+									/>
+								</div>
 							</div>
 						</Rect>
 						{this.state.showcard ? (
-							<Components.Card x={92} y={340} code={this.state.showcard} />
+							<Components.Card
+								x={92}
+								y={340}
+								code={this.state.showcard}
+							/>
 						) : (
 							!this.props.hideMainchat && (
 								<>
@@ -488,7 +565,9 @@ export default connect(({ user, opts }) => ({
 								type="button"
 								value="Wealth T50"
 								onClick={() => {
-									this.props.dispatch(store.doNav(import('./WealthTop')));
+									this.props.dispatch(
+										store.doNav(import('./WealthTop')),
+									);
 								}}
 								onMouseOver={this.mkSetTip(
 									"See who's collected the most wealth",
@@ -553,7 +632,9 @@ export default connect(({ user, opts }) => ({
 										),
 									);
 								}}
-								onMouseOver={this.mkSetTip('Edit & manage your decks')}
+								onMouseOver={this.mkSetTip(
+									'Edit & manage your decks',
+								)}
 								style={{
 									position: 'absolute',
 									left: '14px',
@@ -570,12 +651,16 @@ export default connect(({ user, opts }) => ({
 									marginLeft: '16px',
 								}}
 							/>
-							<div style={{ textAlign: 'center' }}>{quickslots}</div>
+							<div style={{ textAlign: 'center' }}>
+								{quickslots}
+							</div>
 							<input
 								type="button"
 								value="Shop"
 								onClick={() => {
-									this.props.dispatch(store.doNav(import('./Shop')));
+									this.props.dispatch(
+										store.doNav(import('./Shop')),
+									);
 								}}
 								onMouseOver={this.mkSetTip(
 									'Buy booster packs which contain cards from the elements you choose',
@@ -590,9 +675,13 @@ export default connect(({ user, opts }) => ({
 								type="button"
 								value="Upgrade"
 								onClick={() => {
-									this.props.dispatch(store.doNav(import('./Upgrade')));
+									this.props.dispatch(
+										store.doNav(import('./Upgrade')),
+									);
 								}}
-								onMouseOver={this.mkSetTip('Upgrade or sell cards')}
+								onMouseOver={this.mkSetTip(
+									'Upgrade or sell cards',
+								)}
 								style={{
 									position: 'absolute',
 									left: '102px',
@@ -603,7 +692,9 @@ export default connect(({ user, opts }) => ({
 								type="button"
 								value="Bazaar"
 								onClick={() => {
-									this.props.dispatch(store.doNav(import('./Bazaar')));
+									this.props.dispatch(
+										store.doNav(import('./Bazaar')),
+									);
 								}}
 								onMouseOver={this.mkSetTip(
 									"Put up cards for sale & review other players' offers",
@@ -622,7 +713,10 @@ export default connect(({ user, opts }) => ({
 								value={this.props.foename}
 								onChange={e =>
 									this.props.dispatch(
-										store.setOptTemp('foename', e.target.value),
+										store.setOptTemp(
+											'foename',
+											e.target.value,
+										),
 									)
 								}
 								style={{ marginLeft: '24px' }}
@@ -631,7 +725,9 @@ export default connect(({ user, opts }) => ({
 								type="button"
 								value="Library"
 								onClick={() => {
-									const name = self.props.foename || self.props.user.name;
+									const name =
+										self.props.foename ||
+										self.props.user.name;
 									if (name)
 										this.props.dispatch(
 											store.doNav(import('./Library'), {
@@ -665,7 +761,9 @@ export default connect(({ user, opts }) => ({
 								value="Trade"
 								onClick={foe =>
 									sock.offerTrade(
-										typeof foe === 'string' ? foe : self.props.foename,
+										typeof foe === 'string'
+											? foe
+											: self.props.foename,
 									)
 								}
 								onMouseOver={this.mkSetTip(
@@ -685,7 +783,9 @@ export default connect(({ user, opts }) => ({
 										code: self.props.foename,
 									});
 								}}
-								onMouseOver={this.mkSetTip('Redeem a reward code')}
+								onMouseOver={this.mkSetTip(
+									'Redeem a reward code',
+								)}
 								style={{
 									position: 'absolute',
 									left: '112px',
@@ -698,7 +798,9 @@ export default connect(({ user, opts }) => ({
 								type="button"
 								value="Logout"
 								onClick={() => logout('logout')}
-								onMouseOver={this.mkSetTip('Click here to log out')}
+								onMouseOver={this.mkSetTip(
+									'Click here to log out',
+								)}
 								style={{
 									position: 'absolute',
 									left: '744px',
@@ -707,7 +809,11 @@ export default connect(({ user, opts }) => ({
 							/>
 						)}
 						{this.state.showsettings && (
-							<Components.Box x={585} y={380} width={272} height={156}>
+							<Components.Box
+								x={585}
+								y={380}
+								width={272}
+								height={156}>
 								{this.state.changepass ? (
 									<>
 										<input
@@ -779,7 +885,9 @@ export default connect(({ user, opts }) => ({
 									<input
 										type="button"
 										value="Change Password"
-										onClick={() => this.setState({ changepass: true })}
+										onClick={() =>
+											this.setState({ changepass: true })
+										}
 										style={{
 											position: 'absolute',
 											left: '8px',
@@ -800,7 +908,10 @@ export default connect(({ user, opts }) => ({
 										onChange={e => {
 											audio.changeSound(e.target.checked);
 											this.props.dispatch(
-												store.setOpt('enableSound', e.target.checked),
+												store.setOpt(
+													'enableSound',
+													e.target.checked,
+												),
 											);
 										}}
 									/>
@@ -818,7 +929,10 @@ export default connect(({ user, opts }) => ({
 										onChange={e => {
 											audio.changeMusic(e.target.checked);
 											this.props.dispatch(
-												store.setOpt('enableMusic', e.target.checked),
+												store.setOpt(
+													'enableMusic',
+													e.target.checked,
+												),
 											);
 										}}
 									/>
@@ -835,7 +949,10 @@ export default connect(({ user, opts }) => ({
 										checked={this.props.hideMainchat}
 										onChange={e =>
 											this.props.dispatch(
-												store.setOpt('hideMainchat', e.target.checked),
+												store.setOpt(
+													'hideMainchat',
+													e.target.checked,
+												),
 											)
 										}
 									/>
@@ -852,7 +969,10 @@ export default connect(({ user, opts }) => ({
 										checked={this.props.hideRightpane}
 										onChange={e =>
 											this.props.dispatch(
-												store.setOpt('hideRightpane', e.target.checked),
+												store.setOpt(
+													'hideRightpane',
+													e.target.checked,
+												),
 											)
 										}
 									/>
@@ -869,7 +989,10 @@ export default connect(({ user, opts }) => ({
 										checked={this.props.disableTut}
 										onChange={e =>
 											this.props.dispatch(
-												store.setOpt('disableTut', e.target.checked),
+												store.setOpt(
+													'disableTut',
+													e.target.checked,
+												),
 											)
 										}
 									/>
@@ -886,7 +1009,10 @@ export default connect(({ user, opts }) => ({
 										checked={this.props.lofiArt}
 										onChange={e =>
 											this.props.dispatch(
-												store.setOpt('lofiArt', e.target.checked),
+												store.setOpt(
+													'lofiArt',
+													e.target.checked,
+												),
 											)
 										}
 									/>

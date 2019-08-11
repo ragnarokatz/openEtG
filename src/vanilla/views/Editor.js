@@ -92,9 +92,15 @@ export default connect(state => ({
 					<input
 						type="text"
 						value={this.props.deck}
-						onChange={e =>
-							this.props.dispatch(store.setOptTemp('deck', e.target.value))
-						}
+						onChange={e => {
+							let dcode = e.target.value.trim();
+							if (dcode.charAt(3) === ' ') {
+								dcode = etgutil.encodedeck(
+									dcode.split(' ').map(c => parseInt(c, 32) - 4000),
+								);
+							}
+							this.props.dispatch(store.setOptTemp('deck', dcode));
+						}}
 						placeholder="Deck"
 						style={{
 							left: '0px',
