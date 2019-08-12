@@ -103,7 +103,7 @@ pg.trx(async sql => {
 	}
 	if (msv.length) {
 		await sql.query({
-			text: `insert into motd values ${msv.join()}`,
+			text: `insert into motd values ${msv.join()} on conflict do nothing`,
 			values: ms,
 		});
 	}
@@ -122,6 +122,15 @@ pg.trx(async sql => {
 				}
 			}
 		}
+	}
+
+	console.log('CodeHash');
+	const ch = await db.hgetall('CodeHash');
+	for (const code in ch) {
+		await sql.query({
+			text: `insert into codes values ($1, $2)`,
+			values: [code, ch[code]],
+		});
 	}
 })
 	.catch(e => console.log(e))

@@ -35,7 +35,8 @@ export default class Library extends React.Component {
 				return Math.min(
 					(cardpool[code] || 0) +
 						(boundpool[code] || 0) +
-						((cardpool[upcode] || 0) + (boundpool[upcode] || 0)) * 6,
+						((cardpool[upcode] || 0) + (boundpool[upcode] || 0)) *
+							6,
 					42,
 				);
 			};
@@ -45,7 +46,12 @@ export default class Library extends React.Component {
 			reprog = [],
 			reprogmax = [];
 		Cards.Codes.forEach((card, code) => {
-			if (!card.upped && !card.shiny && card.type && !card.getStatus('token')) {
+			if (
+				!card.upped &&
+				!card.shiny &&
+				card.type &&
+				!card.getStatus('token')
+			) {
 				progressmax += 42;
 				const prog = codeprog(code);
 				const idx = card.rarity * 13 + card.element;
@@ -89,7 +95,9 @@ export default class Library extends React.Component {
 							top: `${64 + r * 32}px`,
 							fontSize: '12px',
 							textShadow:
-								reprog[idx] === reprogmax[idx] ? '1px 1px 2px #fff' : undefined,
+								reprog[idx] === reprogmax[idx]
+									? '1px 1px 2px #fff'
+									: undefined,
 						}}>
 						{reprog[idx] || 0} / {reprogmax[idx] || 0}
 					</span>,
@@ -152,7 +160,9 @@ export default class Library extends React.Component {
 						left: '5px',
 						top: '28px',
 					}}
-					onClick={() => open('/collection/' + this.props.name, '_blank')}
+					onClick={() =>
+						open('/collection/' + this.props.name, '_blank')
+					}
 				/>
 				<Components.CardSelector
 					cardpool={this.state.showbound ? boundpool : cardpool}

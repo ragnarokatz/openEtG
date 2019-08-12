@@ -86,9 +86,12 @@ const importlocks = new Map();
 		}
 	}
 	function roleck(key, func) {
-		return async function(data, user, meta) {
-			const ismem = await db.sismember(key, data.u);
-			if (ismem) {
+		return async function(data, user, meta, userid) {
+			const ismem = await pg.pool.query({
+				text: `select exists(select * from user_role ur join roles r on ur.role_id = r.id where ur.user_id = $1 and r.val = $2) res`,
+				values: [userid, key],
+			});
+			if (ismem.rows[0].res) {
 				return func.call(this, data, user, meta);
 			} else {
 				sockEmit(this, 'chat', {
@@ -98,37 +101,63 @@ const importlocks = new Map();
 			}
 		};
 	}
+	function addRoleHandler(role) {
+		return roleck(role, function addRole(data, user) {
+			return pg.pool.query({
+				text: `insert into user_role (user_id, role_id) select u.id, r.id from users u, roles r where u.name = $1 and r.val = $2 on conflict do nothing`,
+				values: [data.m, role],
+			});
+		});
+	}
+	function rmRoleHandler(role) {
+		return roleck(role, function rmRole(data, user) {
+			return pg.pool.query({
+				text: `delete from user_role ur using users u, roles r where ur.user_id = u.id and ur.role_id = r.id and u.name = $1 and r.val = $2`,
+				values: [data.m, role],
+			});
+		});
+	}
+	function listRoleHandler(role) {
+		return async function listRole(data) {
+			const ms = await pg.pool.query({
+				text: `select u.name from user_role ur join users u on u.id = ur.user_id join roles r on r.id = ur.role_id where r.val = $1 order by u.name`,
+				values: [role],
+			});
+			sockEmit(this, 'chat', {
+				mode: 1,
+				msg: ms.rows.map(x => x.name).join(),
+			});
+		};
+	}
 	const userEvents = {
-		modadd: roleck('Mods', function(data, user) {
-			return db.sadd('Mods', data.m);
-		}),
-		modrm: roleck('Mods', function(data, user) {
-			return db.srem('Mods', data.m);
-		}),
-		codesmithadd: roleck('Codesmiths', function(data, user) {
-			return db.sadd('Codesmiths', data.m);
-		}),
-		codesmithrm: roleck('Codesmiths', function(data, user) {
-			return db.srem('Codesmiths', data.m);
-		}),
-		modguest: roleck('Mods', function(data, user) {
+		modadd: addRoleHandler('Mod'),
+		modrm: rmRoleHandler('Mod'),
+		codesmithadd: addRoleHandler('Codesmith'),
+		codesmithrm: rmRoleHandler('Codesmith'),
+		modguest: roleck('Mod', function(data, user) {
 			return db.set('GuestsBanned', data.m === 'off' ? '1' : '');
 		}),
-		modmute: roleck('Mods', function(data, user) {
+		modmute: roleck('Mod', function(data, user) {
 			broadcast({ x: 'mute', m: data.m });
 		}),
-		modclear: roleck('Mods', function(data, user) {
+		modclear: roleck('Mod', function(data, user) {
 			broadcast({ x: 'clear' });
 		}),
-		modmotd: roleck('Mods', function(data, user) {
+		modmotd: roleck('Mod', function(data, user) {
 			const match = data.m.match(/^(\d+) ?(.*)$/);
 			if (match) {
 				const num = match[1],
 					text = match[2];
 				if (text) {
-					return db.zadd('Motd', num, text);
+					return pg.pool.query({
+						text: `insert into motd (id, val) values ($1, $2) on conflict update set val = $2`,
+						values: [num, text],
+					});
 				} else {
-					return db.zremrangebyscore('Motd', num, num);
+					return pg.pool.query({
+						text: `delete from motd where id = $1`,
+						values: [num],
+					});
 				}
 			} else {
 				sockEmit(this, 'chat', { mode: 1, msg: 'Invalid format' });
@@ -153,84 +182,97 @@ const importlocks = new Map();
 			user.streak = [];
 			sockEvents.login.call(this, { u: user.name, a: user.auth });
 		},
-		async logout({ u }, user) {
-			await db.hset('Users', u, JSON.stringify(user));
+		async logout({ u }, user, meta, userId) {
+			await pg.pool.query({
+				text: `update users set data = $2 where id = $1`,
+				values: [userId, JSON.stringify(user)],
+			});
 			Us.users.delete(u);
 			Us.socks.delete(u);
 			sockmeta.delete(this);
 		},
-		async delete({ u }, user) {
-			await db.hdel('Users', u);
+		async delete({ u }, user, meta, userId) {
+			await pg.pool.query({
+				text: `delete from users where id = $1`,
+				values: [userId],
+			});
 			Us.users.delete(u);
 			Us.socks.delete(u);
 			sockmeta.delete(this);
 		},
-		async setarena(data, user) {
+		async setarena(data, user, meta, userId) {
 			if (!user.ocard || !data.d) {
 				return;
 			}
 			const au = `${data.lv ? 'B:' : 'A:'}${data.u}`;
 			if (data.mod) {
-				return db.hmset(au, {
-					deck: data.d,
-					hp: data.hp,
-					draw: data.draw,
-					mark: data.mark,
+				return pg.pool.query({
+					text: `update arena set deck = $3, hp = $4, draw = $5, mark = $6 where user_id = $1 and arena_id = $2`,
+					values: [
+						userId,
+						data.lv ? 2 : 1,
+						data.d,
+						data.hp,
+						data.draw,
+						data.mark,
+					],
 				});
 			} else {
-				const today = sutil.getDay(),
-					res = await db.hmget(au, 'day');
-				if (res && res[0]) {
-					const age = today - res[0];
+				const res = await pg.pool.query({
+					text: `select day from arena where user_id = $1 and arena_id = $2`,
+					values: [userId, data.lv ? 2 : 1],
+				});
+				const today = sutil.getDay();
+				if (res.rowCount) {
+					const age = today - res.rows[0].day;
 					if (age > 0) {
 						user.gold += Math.min(age * 25, 350);
 					}
 				}
-				return db
-					.pipeline()
-					.hmset(au, {
-						day: today,
-						deck: data.d,
-						card: user.ocard,
-						win: 0,
-						loss: 0,
-						hp: data.hp,
-						draw: data.draw,
-						mark: data.mark,
-					})
-					.zadd(`arena${data.lv ? '1' : ''}`, 250, data.u)
-					.exec();
+				return await pg.pool.query({
+					text: `insert into arena (user_id, arena_id, day, deck, card, won, loss, hp, draw, mark, score) values ($1, $2, $3, $4, $5, 0, 0, $6, $7, $8, 250)
+on conflict (user_id, arena_id) do update set day = $3, deck = $4, card = $5, won = 0, loss = 0, hp = $6, draw = $7, mark = $8, score = 250`,
+					values: [
+						userId,
+						data.lv ? 2 : 1,
+						today,
+						data.d,
+						user.ocard,
+						data.hp,
+						data.draw,
+						data.mark,
+					],
+				});
 			}
 		},
-		async arenainfo(data, user) {
-			const res = await db
-				.pipeline([
-					['hgetall', `A:${data.u}`],
-					['hgetall', `B:${data.u}`],
-					['zrevrank', 'arena', data.u],
-					['zrevrank', 'arena1', data.u],
-				])
-				.exec();
+		async arenainfo(data, user, meta, userId) {
 			const day = sutil.getDay();
-			function process(obj, rank) {
-				if (!obj || !obj.day) return null;
-				obj.day = day - obj.day;
-				obj.curhp = getAgedHp(obj.hp, obj.day);
-				if (rank !== null) obj.rank = rank;
-				for (const key of ['draw', 'hp', 'loss', 'mark', 'win', 'card']) {
-					obj[key] = +obj[key];
-				}
-				return obj;
-			}
-			sockEmit(this, 'arenainfo', {
-				A: process(res[0][1], res[2][1]),
-				B: process(res[1][1], res[3][1]),
+			const res = await pg.pool.query({
+				text: `select arena_id, ($2 - day) day, draw, mark, hp, won, loss, code, "rank" from (
+select *, rank(score) over (partition by arena_id order by score) "rank" from arena
+) arena where user_id = $1`,
+				values: [userId, day],
 			});
+			const info = {};
+			for (const row of res.rows) {
+				info[res.arena_id === 1 ? 'A' : 'B'] = {
+					rank: row.rank,
+					hp: row.hp,
+					curhp: getAgedHp(row.hp, row.day),
+					mark: row.mark,
+					draw: row.draw,
+					win: row.won,
+					loss: row.loss,
+					card: row.code,
+				};
+			}
+			sockEmit(this, 'arenainfo', info);
 		},
 		async modarena(data, user) {
 			Us.load(data.aname)
 				.then(user => (user.gold += data.won ? 15 : 5))
 				.catch(() => {});
+<<<<<<< HEAD
 			const arena = `arena${data.lv ? '1' : ''}`,
 				akey = (data.lv ? 'B:' : 'A:') + data.aname;
 			const score = await db.zscore(arena, data.aname);
@@ -247,38 +289,59 @@ const importlocks = new Map();
 				wilson(won + 1, won + loss + 1) * 1000 - (sutil.getDay() - day) * 2,
 				data.aname,
 			);
+=======
+			const arenaId = data.lv ? 2 : 1;
+			const res = await pg.pool.query({
+				text: `select a.user_id, a.won, a.loss, ($3 - a.day) day from arena a join users u on a.user_id = u.id and a.arena_id = $1 where u.name = $2`,
+				values: [arenaId, data.aname, sutil.getDay()],
+			});
+			if (res.rows.length === 0) return;
+			const row = res.rows[0],
+				won = row.won + (data.won ? 1 : 0),
+				loss = row.loss + (data.won ? 0 : 1),
+				wlfield = data.won ? 'won' : 'loss';
+			return pg.pool.query({
+				text: `update arena set ${wlfield} = ${wlfield} + 1, score = $3 where user_id = $1 and arena_id = $2`,
+				values: [
+					row.user_id,
+					arenaId,
+					((wilson(won + 1, won + loss + 1) * 1000) | 0) - row.day,
+				],
+			});
+>>>>>>> Initial draft of replacing redis with postgres in server.js. Still not ported: ImportOriginal, GuestBanned, kongapi
 		},
 		async foearena(data, user) {
-			const len = await db.zcard(`arena${data.lv ? '1' : ''}`);
+			const arenaId = data.lv ? 2 : 1;
+			const reslen = await pg.pool.query({
+					text: `select count(*) len from arena where arena_id = $1`,
+					values: [arenaId],
+				}),
+				{ len } = reslen.rows[0];
 			if (!len) return;
 			const idx = RngMock.upto(Math.min(len, 20));
-			const anames = await db.zrevrange(`arena${data.lv ? '1' : ''}`, idx, idx);
-			if (!anames || !anames.length) {
-				console.log('No arena', idx);
-				return;
-			}
-			const aname = anames[0];
-			const adeck = await db.hgetall(`${data.lv ? 'B:' : 'A:'}${aname}`);
-			adeck.card = +adeck.card;
-			if (data.lv) adeck.card = etgutil.asUpped(adeck.card, true);
-			adeck.hp = +adeck.hp || 200;
-			adeck.mark = +adeck.mark || 1;
-			adeck.draw = +adeck.draw || data.lv + 1;
+			const ares = await pg.pool.query({
+					query: `select u.name, a.* from arena a join users u on u.id = a.user_id having rank(score) over (partition by arena_id order by score) = $2 where arena_id = $1`,
+					values: [arenaId, idx],
+				}),
+				adeck = ares.rows[0];
 			const age = sutil.getDay() - adeck.day;
 			const curhp = getAgedHp(adeck.hp, age);
 			sockEmit(this, 'foearena', {
 				seed: (Math.random() * MAX_INT) | 0,
-				name: aname,
+				name: adeck.name,
 				hp: curhp,
 				age: age,
 				rank: idx,
 				mark: adeck.mark,
 				draw: adeck.draw,
-				deck: `${adeck.deck}05${adeck.card.toString(32)}`,
+				deck: `${adeck.deck}05${(data.lv
+					? etgutil.asUpped(adeck.card, true)
+					: adeck.code
+				).toString(32)}`,
 				lv: data.lv,
 			});
 		},
-		setgold: roleck('Codesmiths', async function(data, user) {
+		setgold: roleck('Codesmith', async function(data, user) {
 			const tgt = await Us.load(data.t);
 			sockEmit(this, 'chat', {
 				mode: 1,
@@ -286,60 +349,88 @@ const importlocks = new Map();
 			});
 			tgt.gold = data.g;
 		}),
-		codecreate: roleck('Codesmiths', async function(data, user) {
+		codecreate: roleck('Codesmith', async function(data, user) {
 			if (!data.t) {
 				return sockEmit(this, 'chat', {
 					mode: 1,
 					msg: `Invalid type ${data.t}`,
 				});
 			}
-			const code = await db.eval(
-				"math.randomseed(ARGV[1])local c repeat c=''for i=1,8 do c=c..string.char(math.random(33,126))end until redis.call('hexists','CodeHash',c)==0 redis.call('hset','CodeHash',c,ARGV[2])return c",
-				0,
-				Math.random() * MAX_INT,
-				data.t,
-			);
-			sockEmit(this, 'chat', { mode: 1, msg: `${data.t} ${code}` });
-		}),
-		async codesubmit(data, user) {
-			const type = await db.hget('CodeHash', data.code || '');
-			if (!type) {
-				sockEmit(this, 'chat', { mode: 1, msg: 'Code does not exist' });
-			} else if (type.charAt(0) === 'G') {
-				const g = +type.slice(1);
-				if (isNaN(g)) {
-					sockEmit(this, 'chat', {
-						mode: 1,
-						msg: `Invalid gold code type: ${type}`,
-					});
-				} else {
-					user.gold += g;
-					sockEmit(this, 'codegold', { g });
-					return db.hdel('CodeHash', data.code);
-				}
-			} else if (type.charAt(0) === 'C') {
-				const c = parseInt(type.slice(1), 32);
-				if (c in Cards.Codes) {
-					user.pool = etgutil.addcard(user.pool, c);
-					sockEmit(this, 'codecode', { card: c });
-					return db.hdel('CodeHash', data.code);
-				} else {
-					sockEmit(this, 'chat', {
-						mode: 1,
-						msg: `Unknown card: ${type}`,
-					});
-				}
-			} else if (type.replace(/^!?(upped)?/, '') in userutil.rewardwords) {
-				sockEmit(this, 'codecard', { type });
-			} else {
-				sockEmit(this, 'chat', {
+			let code = '';
+			for (let i = 0; i < 8; i++) {
+				code += string.fromCharCode(33 + ((Math.random() * 93) | 0));
+			}
+			try {
+				await pg.pool.query({
+					text: `insert into codes values ($1, $2)`,
+					values: [code, data.t],
+				});
+			} catch {
+				return sockEmit(this, 'chat', {
 					mode: 1,
-					msg: `Unknown code type: ${type}`,
+					msg: `Failed to create code`,
 				});
 			}
+			sockEmit(this, 'chat', { mode: 1, msg: `${data.t} ${code}` });
+		}),
+		codesubmit(data, user) {
+			return pg.pool.trx(async sql => {
+				const obj = await sql.query({
+						text: `select val from codes where code = $1`,
+						values: [data.code],
+					}),
+					type = obj.rows[0].val;
+				if (!type) {
+					sockEmit(this, 'chat', {
+						mode: 1,
+						msg: 'Code does not exist',
+					});
+				} else if (type.charAt(0) === 'G') {
+					const g = +type.slice(1);
+					if (isNaN(g)) {
+						sockEmit(this, 'chat', {
+							mode: 1,
+							msg: `Invalid gold code type: ${type}`,
+						});
+					} else {
+						user.gold += g;
+						sockEmit(this, 'codegold', { g });
+						return sql.query({
+							text: `delete from codes where code = $1`,
+							values: [data.code],
+						});
+					}
+				} else if (type.charAt(0) === 'C') {
+					const c = parseInt(type.slice(1), 32);
+					if (c in Cards.Codes) {
+						user.pool = etgutil.addcard(user.pool, c);
+						sockEmit(this, 'codecode', { card: c });
+						return sql.query({
+							text: `delete from codes where code = $1`,
+							values: [data.code],
+						});
+					} else {
+						sockEmit(this, 'chat', {
+							mode: 1,
+							msg: `Unknown card: ${type}`,
+						});
+					}
+				} else if (type.replace(/^!?(upped)?/, '') in userutil.rewardwords) {
+					sockEmit(this, 'codecard', { type });
+				} else {
+					sockEmit(this, 'chat', {
+						mode: 1,
+						msg: `Unknown code type: ${type}`,
+					});
+				}
+			});
 		},
 		async codesubmit2(data, user) {
-			const type = await db.hget('CodeHash', data.code || '');
+			const obj = await sql.query({
+					text: `select val from codes where code = $1`,
+					values: [data.code],
+				}),
+				type = obj.rows[0].val;
 			if (!type) {
 				sockEmit(this, 'chat', { mode: 1, msg: 'Code does not exist' });
 			} else if (type.replace(/^!/, '') in userutil.rewardwords) {
@@ -351,7 +442,10 @@ const importlocks = new Map();
 				) {
 					user.pool = etgutil.addcard(user.pool, data.card);
 					sockEmit(this, 'codedone', { card: data.card });
-					return db.hdel('CodeHash', data.code);
+					return sql.query({
+						text: `delete from codes where code = $1`,
+						values: [data.code],
+					});
 				}
 			} else {
 				sockEmit(this, 'chat', {
@@ -1213,22 +1307,16 @@ const importlocks = new Map();
 			broadcast(data);
 		},
 		async motd(data) {
-			const ms = await db.zrange('Motd', 0, -1, 'withscores');
-			for (let i = 0; i < ms.length; i += 2) {
+			const ms = await pg.pool.query(`select id, val from motd order by id`);
+			for (const row of ms.rows) {
 				sockEmit(this, 'chat', {
 					mode: 1,
-					msg: `motd ${ms[i + 1]} ${ms[i]}`,
+					msg: `motd ${row.id} ${row.val}`,
 				});
 			}
 		},
-		async mod(data) {
-			const mods = await db.smembers('Mods');
-			sockEmit(this, 'chat', { mode: 1, msg: mods.join() });
-		},
-		async codesmith(data) {
-			const mods = await db.smembers('Codesmiths');
-			sockEmit(this, 'chat', { mode: 1, msg: mods.join() });
-		},
+		mod: listRoleHandler('Mod'),
+		codesmith: listRoleHandler('Codesmith'),
 		librarywant(data) {
 			return Us.load(data.f)
 				.then(user => {
@@ -1245,38 +1333,32 @@ const importlocks = new Map();
 				.catch(() => {});
 		},
 		async arenatop(data) {
-			const obj = await db.zrevrange(
-				`arena${data.lv ? '1' : ''}`,
-				0,
-				19,
-				'withscores',
-			);
-			const tasks = [];
-			for (let i = 0; i < obj.length; i += 2) {
-				tasks.push(
-					db.hmget(
-						`${data.lv ? 'B:' : 'A:'}${obj[i]}`,
-						'win',
-						'loss',
-						'day',
-						'card',
-					),
-				);
-			}
-			const res = await Promise.all(tasks);
-			let t20 = [],
-				day = sutil.getDay();
-			for (let i = 0; i < res.length; i++) {
-				const wl = res[i];
-				wl[2] = day - wl[2];
-				wl[3] = +wl[3];
-				t20.push([obj[i * 2], Math.floor(obj[i * 2 + 1])].concat(wl));
-			}
-			sockEmit(this, 'arenatop', { top: t20, lv: data.lv });
+			const day = sutil.getDay();
+			const obj = await pg.pool.query({
+				text: `select u.name, a.code, ($1 - a.day) day, a.won, a.loss, a.score from arena a join users u on u.id = a.user_id where a.arena_id = $2 order by a.score desc limit 20`,
+				values: [day, data.lv ? 2 : 1],
+			});
+			sockEmit(this, 'arenatop', {
+				top: obj.rows.map(row => [
+					row.name,
+					row.score,
+					row.won,
+					row.loss,
+					row.day,
+					row.code,
+				]),
+				lv: data.lv,
+			});
 		},
 		async wealthtop(data) {
-			const obj = await db.zrevrange('wealth', 0, 49, 'withscores');
-			sockEmit(this, 'wealthtop', { top: obj });
+			const obj = await pg.pool.query({
+				text: `select u.name, u.wealth from users order by wealth desc limit 50`,
+			});
+			const top = [];
+			for (const row of obj.rows) {
+				top.push(row.name, row.wealth);
+			}
+			sockEmit(this, 'wealthtop', { top });
 		},
 		chatus(data) {
 			const thismeta = sockmeta.get(this);
@@ -1366,17 +1448,24 @@ const importlocks = new Map();
 			if (func) {
 				const { u } = data;
 				if (typeof u === 'string') {
-					const user = await Us.load(u);
-					if (data.a === user.auth) {
-						const meta = sockmeta.get(this);
-						meta.name = u;
-						Us.socks.set(u, this);
-						delete data.a;
-						const res = await Promise.resolve(
-							func.call(this, data, user, meta),
-						);
-						if (res && func === usercmd[data.x]) {
-							Object.assign(user, res);
+					const result = await pg.pool.query({
+						text: 'select id, auth from user where name = $1',
+						values: [u],
+					});
+					if (result.rows.length) {
+						const [row] = result.rows;
+						if (data.a === row.auth) {
+							const user = await Us.load(u);
+							const meta = sockmeta.get(this);
+							meta.name = u;
+							Us.socks.set(u, this);
+							delete data.a;
+							const res = await Promise.resolve(
+								func.call(this, data, user, meta, row.id),
+							);
+							if (res && func === usercmd[data.x]) {
+								Object.assign(user, res);
+							}
 						}
 					}
 				}
@@ -1414,7 +1503,9 @@ const importlocks = new Map();
 		console.log('Shutting down');
 		app.close();
 		wss.close();
-		Us.stop();
+		Us.stop()
+			.then(() => Promise.all([db.quit(), pg.pool.end()]))
+			.catch(err => console.error(err));
 	});
 })().catch(e =>
 	setImmediate(() => {

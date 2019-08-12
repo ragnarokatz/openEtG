@@ -1,4 +1,5 @@
 import db from './db.js';
+import pg from './pg.js';
 
 const usergc = new Set();
 const userps = new Map();
@@ -27,15 +28,16 @@ const usergcloop = setInterval(() => {
 }, 300000);
 export function stop() {
 	clearInterval(usergcloop);
-	storeUsers()
-		.then(() => db.quit())
-		.catch(e => console.error(e.message));
+	return storeUsers();
 }
 async function _load(name) {
-	const userstr = await db.hget('Users', name);
+	const result = await pg.pool.query({
+		query: `select ud.data from user_data ud join user u where u.name = $1 and ud.type_id = 1`,
+		values: [name],
+	});
 	userps.delete(name);
-	if (userstr) {
-		const user = JSON.parse(userstr);
+	if (result.rows.length) {
+		const user = JSON.parse(result.rows[0].data);
 		users.set(name, user);
 		if (!user.streak) user.streak = [];
 		return user;

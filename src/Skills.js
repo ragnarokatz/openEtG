@@ -567,8 +567,9 @@ const Skills = {
 	},
 	drawpillar: (ctx, c, t) => {
 		const deck = c.owner.deck;
-		if (deck.length && deck[deck.length - 1].card.type === etg.Pillar)
-			Skills.hasten(ctx, c, t);
+		if (deck.length && deck[deck.length - 1].card.type === etg.Pillar) {
+			c.owner.drawcard();
+		}
 	},
 	dryspell: (ctx, c, t) => {
 		c.owner.foe.masscc(
