@@ -56,6 +56,10 @@ create table arena (
 	score int not null,
 	unique (user_id, arena_id)
 );
+create table codes (
+	code text not null primary key,
+	val text not null
+);
 
 insert into roles values (1, 'CodeSmith'), (2, 'Mod');
 insert into arena_types values (1, 'A1'), (2, 'A2');
@@ -65,4 +69,7 @@ create index ix_users_name on users using hash (name);
 create index ix_roles_val on roles using hash (val);
 create index ix_arena_types_val on arena_types using hash (val);
 create index ix_user_data_types_val on user_data_types using hash (val);
+create index ix_arena_score on arena (arena_id, score);
+create index ix_arena_user_id on arena using hash (user_id);
 create index ix_arena_score on arena (score);
+create index ix_bazaar_user_id on bazaar using hash (user_id);

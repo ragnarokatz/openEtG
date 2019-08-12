@@ -124,7 +124,7 @@ quarks.basic_permanents = {
 	],
 	wintext:
 		"Well done! You're getting the hang of this.\n\n" +
-		"But I bet you miss getting to attack every turn. Don't worry, though. Even though I said permanets don't attack every turn, there are special types of permanents that do.",
+		"But I bet you miss getting to attack every turn. Don't worry, though. Even though I said permanents don't attack every turn, there are special types of permanents that do.",
 };
 quarks.basic_equipment = {
 	name: 'Equipment',
