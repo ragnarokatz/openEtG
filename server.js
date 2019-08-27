@@ -22,6 +22,7 @@ import * as usercmd from './src/usercmd.js';
 import * as userutil from './src/userutil.js';
 import * as sutil from './src/srv/sutil.js';
 import db from './src/srv/db.js';
+import * as pg from './src/srv/pg.js';
 import * as Us from './src/srv/Us.js';
 import * as Bz from './src/srv/Bz.js';
 import starter from './src/srv/starter.json';
@@ -184,8 +185,8 @@ const importlocks = new Map();
 		},
 		async logout({ u }, user, meta, userId) {
 			await pg.pool.query({
-				text: `update users set data = $2 where id = $1`,
-				values: [userId, JSON.stringify(user)],
+				text: `update user_data ud set data = $2 from ud.user_id = $1 and ud.type_id = 1`,
+				values: [userId, user],
 			});
 			Us.users.delete(u);
 			Us.socks.delete(u);
@@ -320,7 +321,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 			if (!len) return;
 			const idx = RngMock.upto(Math.min(len, 20));
 			const ares = await pg.pool.query({
-					query: `select u.name, a.* from arena a join users u on u.id = a.user_id having rank(score) over (partition by arena_id order by score) = $2 where arena_id = $1`,
+					text: `select u.name, a.* from arena a join users u on u.id = a.user_id having rank(score) over (partition by arena_id order by score) = $2 where arena_id = $1`,
 					values: [arenaId, idx],
 				}),
 				adeck = ares.rows[0];
@@ -1248,10 +1249,6 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 								Us.load(name)
 									.then(user => {
 										user.auth = data.g;
-										sockEvents.login.call(this, {
-											u: name,
-											a: data.g,
-										});
 										const req = https
 											.request({
 												hostname: 'www.kongregate.com',
@@ -1266,6 +1263,10 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 												userutil.calcWealth(user.pool)}`,
 										);
 										req.end();
+										return sockEvents.login.call(this, {
+											u: name,
+											a: data.g,
+										});
 									})
 									.catch(() => {
 										Us.users.set(name, {
@@ -1273,7 +1274,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 											gold: 0,
 											auth: data.g,
 										});
-										sockEvents.login.call(this, {
+										return sockEvents.login.call(this, {
 											u: name,
 											a: data.g,
 										});
@@ -1352,7 +1353,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 		},
 		async wealthtop(data) {
 			const obj = await pg.pool.query({
-				text: `select u.name, u.wealth from users order by wealth desc limit 50`,
+				text: `select name, wealth from users order by wealth desc limit 50`,
 			});
 			const top = [];
 			for (const row of obj.rows) {
@@ -1449,7 +1450,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 				const { u } = data;
 				if (typeof u === 'string') {
 					const result = await pg.pool.query({
-						text: 'select id, auth from user where name = $1',
+						text: 'select id, auth from users where name = $1',
 						values: [u],
 					});
 					if (result.rows.length) {
