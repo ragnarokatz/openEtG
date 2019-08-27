@@ -45,7 +45,7 @@ pg.trx(async sql => {
 
 		await sql.query({
 			text: `insert into user_data (user_id, type_id, name, data) values ($1, 1, 'Main', $2)`,
-			values: [userId, JSON.stringify(data)],
+			values: [userId, data],
 		});
 		const arenas = await Promise.all([
 			db.hgetall(`A:${user}`),
