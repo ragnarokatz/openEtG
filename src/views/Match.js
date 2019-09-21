@@ -494,6 +494,18 @@ function FoePlays({
 	);
 }
 
+function ShowPlay(idtrack, play, setCard, setLine, clearCard)
+{
+	if (play.isSpell)
+	{
+		if (play.card) 	setCard(play.card);
+		else 			clearCard();
+
+		if (play.t) setLine(idtrack.get(play.c), idtrack.get(play.t));
+		else 		setLine(null, null);
+	}
+}
+
 export default connect(({ user, opts }) => ({ user, lofiArt: opts.lofiArt }))(
 	class Match extends React.Component {
 		constructor(props) {
@@ -635,6 +647,7 @@ export default connect(({ user, opts }) => ({ user, lofiArt: opts.lofiArt }))(
 					const c = game.byId(data.c),
 						isSpell = c.type === etg.Spell;
 					play = {
+						isSpell: isSpell,
 						card: c.card,
 						element: c.card.element,
 						costele: isSpell ? c.card.costele : c.castele,
@@ -648,6 +661,7 @@ export default connect(({ user, opts }) => ({ user, lofiArt: opts.lofiArt }))(
 					};
 				} else {
 					play = {
+						isSpell: false,
 						card: null,
 						element: 0,
 						costele: 0,
@@ -660,12 +674,28 @@ export default connect(({ user, opts }) => ({ user, lofiArt: opts.lofiArt }))(
 						game: game.clone(),
 					};
 				}
-				this.setState(state => {
+
+				/*idtrack={this.idtrack}
+									foeplays={this.state.foeplays.get(player2.id)}
+									setCard={(e, play) => this.setCard(e, play, e.pageX)}
+									setLine={(line0, line1) => this.setState({ line0, line1 })}
+									clearCard={this.clearCard}
+				*/
+
+				ShowPlay(
+					this.idtrack, 
+					play, 
+					(card) => this.setCurrentPlayedSpell(card),
+					(line0, line1) => this.setState({ line0, line1 }),
+					this.clearCard,
+				);
+
+				setTimeout(function() { this.setState(state => {
 					const foeplays = new Map(state.foeplays);
 					if (!foeplays.has(turn)) foeplays.set(turn, []);
 					foeplays.set(turn, foeplays.get(turn).concat([play]));
 					return { foeplays };
-				});
+				})}.bind(this), 1000);
 			}
 			if (data.x === 'mulligan') {
 				sfx.playSound('mulligan');
@@ -1222,6 +1252,14 @@ export default connect(({ user, opts }) => ({ user, lofiArt: opts.lofiArt }))(
 				hoverx: Math.max(x - 80, 172),
 				hovery: e.pageY > 300 ? 44 : 300,
 			});
+		}
+
+		setCurrentPlayedSpell(card) {
+			this.setState({
+				hovercode: card.code,
+				hoverx: 25,
+				hovery: 25,
+			})
 		}
 
 		render() {
