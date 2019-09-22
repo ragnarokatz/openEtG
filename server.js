@@ -273,24 +273,6 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 			Us.load(data.aname)
 				.then(user => (user.gold += data.won ? 15 : 5))
 				.catch(() => {});
-<<<<<<< HEAD
-			const arena = `arena${data.lv ? '1' : ''}`,
-				akey = (data.lv ? 'B:' : 'A:') + data.aname;
-			const score = await db.zscore(arena, data.aname);
-			if (score === null) return;
-			const [incr, mget] = await Promise.all([
-				db.hincrby(akey, data.won ? 'win' : 'loss', 1),
-				db.hmget(akey, data.won ? 'loss' : 'win', 'day'),
-			]);
-			const won = +(data.won ? incr : mget[0]),
-				loss = +(data.won ? mget[0] : incr),
-				day = +mget[1];
-			return db.zadd(
-				arena,
-				wilson(won + 1, won + loss + 1) * 1000 - (sutil.getDay() - day) * 2,
-				data.aname,
-			);
-=======
 			const arenaId = data.lv ? 2 : 1;
 			const res = await pg.pool.query({
 				text: `select a.user_id, a.won, a.loss, ($3 - a.day) day from arena a join users u on a.user_id = u.id and a.arena_id = $1 where u.name = $2`,
@@ -306,10 +288,9 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 				values: [
 					row.user_id,
 					arenaId,
-					((wilson(won + 1, won + loss + 1) * 1000) | 0) - row.day,
+					((wilson(won + 1, won + loss + 1) * 1000) | 0) - row.day * 2,
 				],
 			});
->>>>>>> Initial draft of replacing redis with postgres in server.js. Still not ported: ImportOriginal, GuestBanned, kongapi
 		},
 		async foearena(data, user) {
 			const arenaId = data.lv ? 2 : 1;
