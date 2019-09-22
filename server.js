@@ -185,7 +185,7 @@ const importlocks = new Map();
 		},
 		async logout({ u }, user, meta, userId) {
 			await pg.pool.query({
-				text: `update user_data ud set data = $2 from ud.user_id = $1 and ud.type_id = 1`,
+				text: `update user_data ud set data = $2 where ud.user_id = $1 and ud.type_id = 1`,
 				values: [userId, user],
 			});
 			Us.users.delete(u);
@@ -231,8 +231,8 @@ const importlocks = new Map();
 					}
 				}
 				return await pg.pool.query({
-					text: `insert into arena (user_id, arena_id, day, deck, card, won, loss, hp, draw, mark, score) values ($1, $2, $3, $4, $5, 0, 0, $6, $7, $8, 250)
-on conflict (user_id, arena_id) do update set day = $3, deck = $4, card = $5, won = 0, loss = 0, hp = $6, draw = $7, mark = $8, score = 250`,
+					text: `insert into arena (user_id, arena_id, day, deck, code, won, loss, hp, draw, mark, score) values ($1, $2, $3, $4, $5, 0, 0, $6, $7, $8, 250)
+on conflict (user_id, arena_id) do update set day = $3, deck = $4, code = $5, won = 0, loss = 0, hp = $6, draw = $7, mark = $8, score = 250`,
 					values: [
 						userId,
 						data.lv ? 2 : 1,
@@ -249,15 +249,16 @@ on conflict (user_id, arena_id) do update set day = $3, deck = $4, card = $5, wo
 		async arenainfo(data, user, meta, userId) {
 			const day = sutil.getDay();
 			const res = await pg.pool.query({
-				text: `select arena_id, ($2 - day) day, draw, mark, hp, won, loss, code, "rank" from (
-select *, rank(score) over (partition by arena_id order by score) "rank" from arena
+				text: `select arena_id, ($2 - arena.day) "day", draw, mark, hp, won, loss, code, deck, "rank" from (
+select *, (rank() over (partition by arena_id order by score))::int "rank" from arena
 ) arena where user_id = $1`,
 				values: [userId, day],
 			});
 			const info = {};
 			for (const row of res.rows) {
-				info[res.arena_id === 1 ? 'A' : 'B'] = {
+				info[row.arena_id === 1 ? 'A' : 'B'] = {
 					rank: row.rank,
+					day: row.day,
 					hp: row.hp,
 					curhp: getAgedHp(row.hp, row.day),
 					mark: row.mark,
@@ -265,6 +266,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 					win: row.won,
 					loss: row.loss,
 					card: row.code,
+					deck: row.deck,
 				};
 			}
 			sockEmit(this, 'arenainfo', info);
@@ -275,7 +277,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 				.catch(() => {});
 			const arenaId = data.lv ? 2 : 1;
 			const res = await pg.pool.query({
-				text: `select a.user_id, a.won, a.loss, ($3 - a.day) day from arena a join users u on a.user_id = u.id and a.arena_id = $1 where u.name = $2`,
+				text: `select a.user_id, a.won, a.loss, ($3 - a.day) "day" from arena a join users u on a.user_id = u.id and a.arena_id = $1 where u.name = $2`,
 				values: [arenaId, data.aname, sutil.getDay()],
 			});
 			if (res.rows.length === 0) return;
@@ -302,7 +304,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 			if (!len) return;
 			const idx = RngMock.upto(Math.min(len, 20));
 			const ares = await pg.pool.query({
-					text: `select u.name, a.* from arena a join users u on u.id = a.user_id having rank(score) over (partition by arena_id order by score) = $2 where arena_id = $1`,
+					text: `select u.name, a.* from arena a join users u on u.id = a.user_id having rank() over (partition by arena_id order by score) = $2 where arena_id = $1`,
 					values: [arenaId, idx],
 				}),
 				adeck = ares.rows[0];
@@ -1317,7 +1319,7 @@ select *, rank(score) over (partition by arena_id order by score) "rank" from ar
 		async arenatop(data) {
 			const day = sutil.getDay();
 			const obj = await pg.pool.query({
-				text: `select u.name, a.code, ($1 - a.day) day, a.won, a.loss, a.score from arena a join users u on u.id = a.user_id where a.arena_id = $2 order by a.score desc limit 20`,
+				text: `select u.name, a.code, ($1 - a.day) "day", a.won, a.loss, a.score from arena a join users u on u.id = a.user_id where a.arena_id = $2 order by a.score desc limit 20`,
 				values: [day, data.lv ? 2 : 1],
 			});
 			sockEmit(this, 'arenatop', {

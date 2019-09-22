@@ -12,6 +12,7 @@ import RngMock from '../RngMock.js';
 
 function RenderInfo(props) {
 	const { info, y, name } = props;
+	console.log(info);
 	if (info) {
 		const testDeck = () => {
 			const deck = sock.getDeck();
@@ -58,7 +59,7 @@ function RenderInfo(props) {
 					}}
 					text={
 						`W-L: ${info.win || 0} - ${info.loss || 0}` +
-						`, Rank: ${info.rank == undefined ? 'Inactive' : info.rank + 1}` +
+						`, Rank: ${info.rank == undefined ? 'Inactive' : info.rank}` +
 						`, ${(info.win || 0) * 15 + (info.loss || 0) * 5}$`
 					}
 				/>
